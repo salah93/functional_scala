@@ -1,0 +1,6 @@
+.idea/
+assignment.sbt
+out/
+project/
+target/
+*.iml
