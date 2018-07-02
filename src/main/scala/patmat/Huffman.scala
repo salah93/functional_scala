@@ -74,15 +74,22 @@ object Huffman {
    *   }
    */
     def times(chars: List[Char]): List[(Char, Int)]  = {
-      def loop(chars: List[Char], m: Map[Char, Int]): Map[Char, Int] = {
-        chars match {
-          case Nil => m
-          case h :: t =>
-            val count = m.getOrElse(h, 0) + 1
-            loop(t, m ++ Map(h -> count))
+      def intoList(char: Char, acc: List[(Char, Int)]): List[(Char, Int)] = {
+        acc match {
+          case Nil => (char, 1) :: acc
+          case (c, freq) :: xs =>
+            if (char == c) (c, freq + 1) :: xs else (c, freq) :: intoList(char, xs)
         }
       }
-      loop(trim(chars), Map()).toList
+
+      def loop(chars: List[Char], acc: List[(Char, Int)]): List[(Char, Int)] = {
+        chars match {
+          case Nil => acc
+          case char :: chars_tail =>
+            loop(chars_tail, intoList(char, acc))
+        }
+      }
+      loop(chars, Nil)
     }
 
 
@@ -93,9 +100,25 @@ object Huffman {
    * head of the list should have the smallest weight), where the weight
    * of a leaf is the frequency of the character.
    */
-    def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] =
-      freqs.map(tuple => Leaf(tuple._1, tuple._2))
-        .sortWith((l1, l2) => l1.weight < l2.weight)
+    def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] = {
+      //freqs.map(tuple => Leaf(tuple._1, tuple._2)).sortWith((l1, l2) => l1.weight < l2.weight)
+
+      def insertInto(tuple: (Char, Int), leaves: List[Huffman.Leaf]): List[Leaf] =
+        leaves match {
+          case Nil => Leaf(tuple._1, tuple._2) :: Nil
+          case h :: t =>
+            if (tuple._2 > h.weight) h :: insertInto(tuple, t)
+            else Leaf(tuple._1, tuple._2) :: leaves
+        }
+
+      def insertionSort(f: List[(Char, Int)], acc: List[Leaf]): List[Leaf] =
+        f match {
+          case Nil => acc
+          case h :: t => insertionSort(t, insertInto(h, acc))
+        }
+
+      insertionSort(freqs, Nil)
+    }
 
   
   /**
@@ -115,11 +138,32 @@ object Huffman {
    * If `trees` is a list of less than two elements, that list should be returned
    * unchanged.
    */
-    def combine(trees: List[CodeTree]): List[CodeTree] = trees match {
+    def combine(trees: List[CodeTree]): List[CodeTree] = {
+      def getWeight(elem: CodeTree): Int = {
+        elem match {
+          case Fork(_, _, _, w) => w
+          case Leaf(_, w) => w
+        }
+      }
+
+      trees match {
         case Nil => trees
         case _ :: Nil => trees
-        case h :: h2 :: t => makeCodeTree(h, h2) :: t
+        case h :: h2 :: t =>
+          // insert union into list sorted
+          val union = makeCodeTree(h, h2)
+          val code_tree_weight = getWeight(union)
+
+          def loop(ct: CodeTree, list_trees: List[CodeTree]): List[CodeTree] =
+            list_trees match {
+              case Nil => ct :: Nil
+              case head :: tail =>
+                if (code_tree_weight <= getWeight(head)) ct :: list_trees
+                else head :: loop(ct, tail)
+            }
+          loop(union, t)
       }
+    }
 
   /**
    * This function will be called in the following way:
@@ -149,18 +193,15 @@ object Huffman {
    * The parameter `chars` is an arbitrary text. This function extracts the character
    * frequencies from that text and creates a code tree based on them.
    */
-    def createCodeTree(chars: List[Char]): CodeTree = {
-      val trimmed_chars = trim(chars)
-      val ct = until(singleton, combine)(makeOrderedLeafList(times(trimmed_chars)))
-      ct.head
-    }
+    def createCodeTree(chars: List[Char]): CodeTree =
+      until(singleton, combine)(makeOrderedLeafList(times(chars))).head
 
 
   // Part 3: Decoding
 
   type Bit = Int
 
-  /**
+   /**
    * This function decodes the bit sequence `bits` using the code tree `tree` and returns
    * the resulting list of characters.
    */
@@ -201,14 +242,12 @@ object Huffman {
 
   // Part 4a: Encoding using Huffman tree
 
-  def trim(chars: List[Char]) : List[Char] = chars.filter(_ != ' ').map(_.toLower)
   /**
    * This function encodes `text` using the code tree `tree`
    * into a sequence of bits.
    */
     def encode(tree: CodeTree)(text: List[Char]): List[Bit] = {
-      val updated_text = trim(text)
-      updated_text.flatMap(char => {
+      text.flatMap(char => {
         encodeChar(char, tree, Nil).reverse
       })
     }
@@ -270,9 +309,8 @@ object Huffman {
    * and then uses it to perform the actual encoding.
    */
     def quickEncode(tree: CodeTree)(text: List[Char]): List[Bit] = {
-      val updated_text = trim(text)
       val codetable = convert(tree)
-      updated_text.flatMap(c => codetable.find(tuple => tuple._1 == c) match {
+      text.flatMap(c => codetable.find(tuple => tuple._1 == c) match {
         case None => Nil
         case Some((_, bits)) => bits
       })
@@ -281,6 +319,7 @@ object Huffman {
 
 object Main extends App {
   import Huffman._
-  val ct: CodeTree = Fork(Fork(Leaf('a', 1), Leaf('b', 1), List('a', 'b'), 2), Fork(Leaf('c', 1), Leaf('d', 1), List('c', 'd'), 2), List('a', 'b', 'c', 'd'), 4)
-  println(encode(ct)("cab".toList))
+  //val ct: CodeTree = Fork(Fork(Leaf('a', 1), Leaf('b', 1), List('a', 'b'), 2), Fork(Leaf('c', 1), Leaf('d', 1), List('c', 'd'), 2), List('a', 'b', 'c', 'd'), 4)
+  //println(encode(ct)("cab".toList))
+  times("lovo".toList)
 }
