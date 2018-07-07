@@ -1,8 +1,5 @@
 package forcomp
 
-import org.scalactic.Accumulation.Combinable
-
-
 object Anagrams {
   /** A word is simply a `String`. */
   type Word = String
