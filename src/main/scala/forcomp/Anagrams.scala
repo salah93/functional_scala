@@ -1,8 +1,9 @@
 package forcomp
 
+import org.scalactic.Accumulation.Combinable
+
 
 object Anagrams {
-
   /** A word is simply a `String`. */
   type Word = String
 
@@ -34,7 +35,7 @@ object Anagrams {
    *
    *  Note: you must use `groupBy` to implement this method!
    */
-  def wordOccurrences(w: Word): Occurrences = (w groupBy (e => e)).map{case (c, s) => c -> s.length}.toList
+  def wordOccurrences(w: Word): Occurrences = (w.toLowerCase groupBy (e => e)).map{case (c, s) => c -> s.length}.toList.sortWith(_._1 < _._1)
 
   /** Converts a sentence into its character occurrence list. */
   def sentenceOccurrences(s: Sentence): Occurrences = wordOccurrences(s.foldLeft("")(_ + _))
@@ -81,7 +82,16 @@ object Anagrams {
    *  Note that the order of the occurrence list subsets does not matter -- the subsets
    *  in the example above could have been displayed in some other order.
    */
-  def combinations(occurrences: Occurrences): List[Occurrences] = ???
+  def combinations(occurrences: Occurrences): List[Occurrences] = {
+    occurrences.foldRight(List[Occurrences](Nil)) {
+      case ((char, int), acc: List[Occurrences]) =>
+        acc ++ (for {
+          comb <- acc
+          i <- 1 to int
+        } yield (char, i) :: comb)
+      }
+  }
+
 
   /** Subtracts occurrence list `y` from occurrence list `x`.
    *
@@ -93,7 +103,20 @@ object Anagrams {
    *  Note: the resulting value is an occurrence - meaning it is sorted
    *  and has no zero-entries.
    */
-  def subtract(x: Occurrences, y: Occurrences): Occurrences = ???
+  def subtract(x: Occurrences, y: Occurrences): Occurrences = y match {
+    case Nil => x
+    case (char, freq) :: t =>
+      val (pre, post) = x.span{
+        case (c, _) => c != char
+      }
+      val new_freq = post.head._2  - freq
+
+      if (new_freq > 0){
+        pre ++ ((char, new_freq) :: subtract(post.tail, t))
+      }
+      else pre ++ subtract(post.tail, t)
+
+  }
 
   /** Returns a list of all anagram sentences of the given sentence.
    *
@@ -135,5 +158,44 @@ object Anagrams {
    *
    *  Note: There is only one anagram of an empty sentence.
    */
-  def sentenceAnagrams(sentence: Sentence): List[Sentence] = ???
+  def sentenceAnagrams(sentence: Sentence): List[Sentence] = {
+    def loop(occ: Occurrences): List[Sentence] = {
+      if (occ.isEmpty) List(Nil)
+      else for {
+        o <- combinations(occ)
+        w <- dictionaryByOccurrences.getOrElse(o, Nil)
+        s <- loop(subtract(occ, wordOccurrences(w)))
+        if !w.isEmpty
+      } yield w :: s
+    }
+    val occurrences = sentenceOccurrences(sentence)
+    loop(occurrences)
+  }
+    /*
+    get occur list of sentence
+    combos, subtract
+
+    for {
+    c <- combos
+    w <- dict.getOrElse(c, Nil)
+    } yield w :: subtrace(occ, w)
+
+
+    for i in 1 until length
+     a, b in s split i
+      wordAnagrams(a) :: word(anagrams b)
+
+   */
+
+  def main(args: Array[String]): Unit = {
+    val s = "yes man".split(" ").toList
+    /*
+    val o = wordOccurrences("aabb")
+    println(o)
+    val sub = wordOccurrences("b")
+    println(sub)
+    println(subtract(o , sub))
+    */
+    println(sentenceAnagrams(s))
+  }
 }
